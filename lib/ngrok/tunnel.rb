@@ -82,13 +82,18 @@ module Ngrok
 
       def fetch_urls
         @params[:timeout].times do
+          
+          @params[:log].rewind
           log_content = @params[:log].read
-          result = log_content.scan(/URL:(.+)\sProto:(http|https)\s/)
-          if !result.empty?
-            result = Hash[*result.flatten].invert
-            @ngrok_url = result['http']
-            @ngrok_url_https = result['https']
-            return @ngrok_url if @ngrok_url
+          log_content.scan(/Read message (.*)$/).each do |x|
+            begin
+              j = JSON.parse(x[0])
+              next unless j["Type"] == 'NewTunnel'
+              @ngrok_url       = j["Payload"]["Url"] if j["Payload"]["Protocol"] == 'http'
+              @ngrok_url_https = j["Payload"]["Url"] if j["Payload"]["Protocol"] == 'https'
+              return @ngrok_url if @ngrok_url
+            rescue
+            end
           end
 
           error = log_content.scan(/msg="command failed" err="([^"]+)"/).flatten
